@@ -1,53 +1,79 @@
 <script>
-    let foodNames = [
-        "kebab",
-        "pizza",
-        "burger",
-        "chicken",
-        "cheburek",
-        "burrito",
-        "bagels",
-        "subway",
-    ];
+    let foods = window.localStorage.getItem('foods') ? JSON.parse(window.localStorage.getItem('foods')) : [];
+    $: sum = foods.reduce((acc, curFood) => acc + curFood.points, 0);
+
     let chosenFood = "";
     let foodInput = "";
 
+    function updateStorage() {
+        localStorage.setItem('foods', JSON.stringify(foods));
+    }
+
+    function resetPoints() {
+        foods.forEach((food) => food.points = foods.length);
+        foods = foods;
+        updateStorage();
+    }
+
     function addFood() {
-        if (foodNames.indexOf(foodInput) == -1) {
-            foodNames = [...foodNames, foodInput];
+        if (foods.every((food) => foodInput !== food.name)) {
+            foods.push({name: foodInput, points: foods.length});
+            foods.forEach((food) => food.points++);
+            foods = foods;
             foodInput = "";
+            updateStorage();
         }
     }
 
     function removeFood(foodNameToRemove) {
-        foodNames.splice(foodNames.indexOf(foodNameToRemove), 1);
-        foodNames = foodNames;
+        foods.splice(foods.findIndex((food) => food.name === foodNameToRemove), 1);
+        foods.forEach((food) => {
+            if (food.points > 0) {
+                food.points--;
+            }
+        });
+        foods = foods;
+        updateStorage();
     }
 
     async function chooseFood() {
-        if (foodNames.length) {
-            let res = await fetch(`https://www.random.org/integers/?num=1&min=0&max=${foodNames.length - 1}&col=1&base=10&format=plain&rnd=new`);
-            let chosenId = await res.text();
-            chosenId = chosenId.trim();
-            chosenFood = foodNames[chosenId];
+        if (sum > 1) {
+            let res = await fetch(`https://www.random.org/integers/?num=1&min=1&max=${sum}&col=1&base=10&format=plain&rnd=new`);
+            let chosenNumber = await res.text();
+            chosenNumber = +chosenNumber.trim();
+            let collectedPoints = 0;
+            for (const food of foods) {
+                if (chosenNumber > collectedPoints && chosenNumber <= collectedPoints + food.points) {
+                    chosenFood = food.name;
+                    food.points--;
+                    break;
+                }
+                collectedPoints += food.points;
+            }
+            foods = foods;
+            updateStorage();
         }
     }
 </script>
 
 <main>
     <div class="food-list">
-        {#each foodNames as foodName (foodName)}
+        {#each foods as food (food.name)}
             <div class="food">
-                {foodName}
-                <button on:click={() => { removeFood(foodName); }}>-</button>
+                <strong>{food.name}</strong>
+                ({food.points} / {sum} = {Math.round((food.points / sum) * 100)}%)
+                <button on:click={() => { removeFood(food.names); }}>-</button>
             </div>
         {/each}
+    </div>
+    <div class="reset center">
+        <button on:click={resetPoints}>Reset points</button>
     </div>
     <div class="add">
         <input type="text" bind:value={foodInput} />
         <button on:click={addFood}>+</button>
     </div>
-    <div class="choose">
+    <div class="choose center">
         <button on:click={chooseFood}>Choose food</button>
     </div>
     <div class="chosen-food">
@@ -91,7 +117,7 @@
         width: 10%;
     }
 
-    .choose {
+    .center {
         text-align: center;
         margin-bottom: 4px;
     }
